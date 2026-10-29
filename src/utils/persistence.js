@@ -1,5 +1,6 @@
 import { readFile, writeFile, rename, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { useBlob, readBlobData, updateBlobData } from './storage.js';
 
 const FILES = {
   users: fileURLToPath(new URL('../data/users.json', import.meta.url)),
@@ -17,6 +18,7 @@ function fileOf(resource) {
 
 export async function readData(resource) {
   const file = fileOf(resource);
+  if (useBlob) return readBlobData(resource);
   const text = await readFile(file, 'utf8');
   let data;
   try {
@@ -30,6 +32,11 @@ export async function readData(resource) {
 
 export async function updateData(resource, callback) {
   const file = fileOf(resource);
+  if (useBlob) {
+    const run = queues[resource].then(() => updateBlobData(resource, callback));
+    queues[resource] = run.catch(() => {});
+    return run;
+  }
   const run = queues[resource].then(async () => {
     const data = await readData(resource);
     const result = await callback(data); // Si lanza un error, no se escribe nada.

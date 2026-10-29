@@ -1,12 +1,8 @@
 import { Router } from 'express';
-import { unlink } from 'node:fs/promises';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { readData, updateData } from '../utils/persistence.js';
-import { uploadPets, verifyImages } from '../middlewares/multer.middleware.js';
+import { uploadPets, verifyImages, deleteImages } from '../middlewares/multer.middleware.js';
 
 const router = Router();
-const imagesDirectory = fileURLToPath(new URL('../../public/img/pets/', import.meta.url));
 const uploadImages = uploadPets.array('img', 5);
 const allowedFields = ['especie', 'color', 'edad', 'sexo'];
 
@@ -53,23 +49,7 @@ function validateFields(body = {}, partial = false) {
   return values;
 }
 
-// Solo elimina nombres simples dentro de public/img/pets, nunca rutas del cliente.
-async function removeImages(urls) {
-  const results = await Promise.allSettled(urls.map(async (url) => {
-    if (typeof url !== 'string' || !url.startsWith('/img/pets/')) return;
-    const name = url.slice('/img/pets/'.length);
-    if (!name || name === '.' || name === '..' || /[\\/:\x00]/.test(name)) return;
-    try {
-      await unlink(path.join(imagesDirectory, name));
-    } catch (error) {
-      if (error.code !== 'ENOENT') throw error;
-    }
-  }));
-  // Una limpieza fallida no convierte un cambio ya guardado en un falso error.
-  for (const result of results) {
-    if (result.status === 'rejected') console.error('No se pudo limpiar una imagen de mascota:', result.reason);
-  }
-}
+const removeImages = deleteImages;
 
 const uploadedUrls = (req) => (req.files ?? []).map((file) => `/img/pets/${file.filename}`);
 

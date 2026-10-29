@@ -21,7 +21,7 @@ El Word del profesor establece los requisitos de la API. La interfaz se conserva
 ## Requisitos e instalación
 
 - Node.js 18 o superior y npm. La revisión se ejecutó con Node.js 24.14.0.
-- Express y Multer son las únicas dependencias externas; las versiones instaladas se conservan en `package-lock.json`.
+- Express, Multer y el SDK oficial @vercel/blob son las dependencias externas; las versiones instaladas se conservan en `package-lock.json`.
 - Módulos ES mediante `"type": "module"`.
 
 Desde la carpeta donde está `package.json`:
@@ -43,7 +43,7 @@ Para reinicio automático durante desarrollo:
 npm run dev
 ```
 
-No se necesita `.env`. Opcionalmente se puede cambiar el puerto con la variable de entorno `PORT`.
+No se necesita `.env` en local. Opcionalmente se puede cambiar el puerto con `PORT`. Para Vercel, seguir [la guía de despliegue](DESPLIEGUE_VERCEL.md) y conectar un almacén Blob privado.
 
 ## Estructura
 
@@ -68,13 +68,19 @@ No se necesita `.env`. Opcionalmente se puede cambiar el puerto con la variable 
 │   │   └── pets.router.js
 │   ├── utils/
 │   │   ├── crypto.js
-│   │   └── persistence.js
+│   │   ├── persistence.js
+│   │   └── storage.js
 │   └── data/
 │       ├── users.json
 │       └── pets.json
 ├── tests/
 │   ├── api.test.mjs
+│   ├── storage.test.mjs
+│   ├── cloud.test.mjs
 │   └── server.mjs
+├── DESPLIEGUE_VERCEL.md
+├── vercel.json
+├── .env.example
 ├── .gitignore
 ├── package.json
 ├── package-lock.json
@@ -102,7 +108,7 @@ Rutas de la interfaz: `/#/`, `/#/mascotas`, `/#/mascotas/nueva`, `/#/usuarios` y
 
 Si el callback falla, no se escriben sus cambios. Las modificaciones se ordenan por recurso para evitar pérdida de registros entre peticiones simultáneas. Se escribe un archivo temporal y después se reemplaza el JSON completo. Un archivo ausente o corrupto produce un error 500; no se reemplaza automáticamente por un array vacío.
 
-El proyecto debe ejecutarse en un solo proceso Node para que la cola en memoria coordine todas las escrituras. Los JSON se entregan inicializados con `[]`.
+En modo local, el proyecto debe ejecutarse en un solo proceso Node para que la cola en memoria coordine todas las escrituras. Los JSON se entregan inicializados con `[]`.
 
 ## Endpoints
 
@@ -151,7 +157,7 @@ Los campos desconocidos o administrados por el servidor se rechazan con 400. Los
 
 El campo es `img`, no `img[]`, `foto` ni `images`. No se envían rutas del computador como texto.
 
-Multer usa `diskStorage` para guardar los archivos en `public/img/users` o `public/img/pets`. Los nombres combinan fecha, UUID y extensión para evitar colisiones. Se admiten JPG, PNG, GIF y WebP, con máximo 5 MiB por archivo. Además del MIME, se comprueba la cabecera del archivo para rechazar contenido que no corresponda al formato declarado.
+En local, Multer usa `diskStorage` para guardar los archivos en `public/img/users` o `public/img/pets`. En Vercel la carga se valida en /tmp y se traslada a Blob privado; sus URLs se mantienen bajo /img. Los nombres combinan fecha, UUID y extensión para evitar colisiones. Se admiten JPG, PNG, GIF y WebP, con máximo 5 MiB por archivo. Además del MIME, se comprueba la cabecera del archivo para rechazar contenido que no corresponda al formato declarado.
 
 ## Ejemplos de usuarios
 
@@ -274,7 +280,7 @@ Ejemplo:
 npm test
 ```
 
-La suite contiene 47 pruebas HTTP y utiliza un proceso auxiliar con copias temporales de la aplicación y los datos. No cambia los JSON ni las imágenes del proyecto. Comprueba los diez endpoints, estados HTTP, cargas, hashes, concurrencia, errores de lectura y escritura, limpieza de imágenes e independencia de recursos. También detiene y reinicia el proceso para verificar la persistencia y comprueba que HTML, CSS y JavaScript se sirven correctamente.
+La suite contiene 59 pruebas de API y almacenamiento y utiliza un proceso auxiliar con copias temporales de la aplicación y los datos. No cambia los JSON ni las imágenes del proyecto. Comprueba los diez endpoints, estados HTTP, cargas, hashes, concurrencia, errores de lectura y escritura, limpieza de imágenes e independencia de recursos. También detiene y reinicia el proceso para verificar la persistencia y comprueba que HTML, CSS y JavaScript se sirven correctamente.
 
 Durante la revisión se verificaron además 19 recorridos en Chrome: formularios reales, búsquedas, filtros, detalle, subida y reemplazo de archivos, eliminación, errores y vistas móviles. Estas comprobaciones de navegador se realizaron aparte de `npm test`, sin añadir dependencias a la aplicación. Los datos e imágenes de esas pruebas se crearon en una copia temporal y no forman parte de la entrega.
 
@@ -282,4 +288,12 @@ Durante la revisión se verificaron además 19 recorridos en Chrome: formularios
 
 Versionar el código, README, package-lock.json, pruebas, JSON iniciales con `[]` y `.gitkeep`. No subir node_modules, archivos de entorno, imágenes ni registros de pruebas. Antes de entregar, comprobar `npm ci`, `npm test` y `npm start` desde un clon limpio.
 
-Este proyecto requiere un entorno con escritura persistente en disco para sus JSON e imágenes; la configuración de despliegue serverless no forma parte de este entregable.
+Para Vercel se añadió un modo de almacenamiento persistente con Blob privado. Consulta DESPLIEGUE_VERCEL.md antes de desplegar. En local se conservan los archivos JSON y el almacenamiento en disco del ejercicio.
+
+## Funcionamiento en Vercel
+
+Vercel activa automáticamente el almacenamiento Blob. Los JSON se guardan como archivos privados y las imágenes se publican mediante las mismas rutas /img/users y /img/pets. Multer usa diskStorage temporal en /tmp, valida las imágenes y las traslada al almacén persistente; los temporales se eliminan. No se utiliza /tmp como una base de datos ni para prometer persistencia.
+
+En nube se mantienen hasta cinco fotos por mascota y se limita la suma a 3 MiB por formulario, por el límite de petición de Vercel. El límite local de 5 MiB por archivo no cambia. La interfaz muestra el límite de su entorno automáticamente.
+
+Las escrituras comparan la versión ETag para evitar pérdidas entre distintas instancias. Un conflicto vuelve a leer los datos y reintenta; si persiste, devuelve 503. La falta de conexión a Blob también devuelve 503 y no guarda falsamente en disco temporal. Las ocho pruebas de contratos Blob utilizan un servicio simulado; cuatro pruebas adicionales comprueban el modo Vercel sin credenciales y el límite de cargas. El almacén real requiere la comprobación descrita en la guía.

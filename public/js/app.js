@@ -1,6 +1,7 @@
 const API_BASE = (document.querySelector('meta[name="api-base"]')?.content ?? '').replace(/\/$/, '');
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-const MAX_IMAGE_MB = 5;
+const MAX_IMAGE_MB = window.HUELLAS_CONFIG?.maxImageMB ?? 5;
+const MAX_TOTAL_IMAGE_BYTES = window.HUELLAS_CONFIG?.maxTotalImageBytes ?? null;
 const MAX_PET_IMAGES = 5;
 
 const app = document.getElementById('app');
@@ -163,7 +164,7 @@ const pickerTemplate = (id, max, title) => html`<div class="picker" data-picker=
     <input class="sr-only" id="${id}" type="file" accept="${IMAGE_TYPES.join(',')}" ${max > 1 ? raw('multiple') : ''}>
     <span class="dz-icon">${icon('upload')}</span>
     <strong>${title}</strong>
-    <span class="muted small">JPG, PNG, GIF o WEBP · máximo ${MAX_IMAGE_MB} MB por imagen · <span class="picker-count">0 de ${max}</span></span>
+    <span class="muted small">JPG, PNG, GIF o WEBP · ${MAX_TOTAL_IMAGE_BYTES ? 'máximo 3 MB entre todas las imágenes' : `máximo ${MAX_IMAGE_MB} MB por imagen`} · <span class="picker-count">0 de ${max}</span></span>
   </label>
   <p class="field-error picker-error" role="alert"></p>
   <div><button class="btn btn-soft btn-sm" type="button" data-picker-clear hidden>Limpiar selección</button></div>
@@ -199,6 +200,8 @@ function imagePicker(root, max, onChange) {
       return;
     }
     const problems = selected.map(checkImage).filter(Boolean);
+    const candidate = max === 1 ? selected : [...files, ...selected];
+    if (MAX_TOTAL_IMAGE_BYTES && candidate.reduce((sum, file) => sum + file.size, 0) > MAX_TOTAL_IMAGE_BYTES) problems.push('Las imágenes juntas deben pesar como máximo 3 MB.');
     if (problems.length) { error.textContent = problems.join('. '); clear.hidden = false; return; }
     error.textContent = '';
     if (max === 1 && selected.length) files.length = 0;
