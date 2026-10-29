@@ -1,14 +1,1 @@
-[
-  {
-    "id": 1,
-    "ownerId": 1,
-    "especie": "Gato",
-    "color": "Amarillo",
-    "edad": 1.8,
-    "sexo": "Macho",
-    "img": [
-      "/img/pets/1793287028322-af6d7fb7-5f6e-497c-b947-68962b234bfa.png",
-      "/img/pets/1793287028331-e800e475-253b-4871-89e7-c1233d63a9b2.png"
-    ]
-  }
-]
+[]

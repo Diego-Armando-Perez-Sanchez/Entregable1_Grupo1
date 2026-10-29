@@ -1,14 +1,11 @@
 import express from 'express';
 import multer from 'multer';
-import { fileURLToPath } from 'node:url';
-import { PORT } from './config.js';
-import authRouter from './routes/auth.router.js';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import usersRouter from './routes/users.router.js';
 import petsRouter from './routes/pets.router.js';
-import productsRouter from './routes/products.router.js';
 import { discardUploads, uploadErrorMessage } from './middlewares/multer.middleware.js';
 
-const app = express();
+export const app = express();
 
 app.disable('x-powered-by');
 app.use((req, res, next) => {
@@ -19,17 +16,14 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(fileURLToPath(new URL('../public', import.meta.url))));
 
-app.use('/api/auth', authRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/pets', petsRouter);
-app.use('/api/products', productsRouter);
 
 app.use((req, res) => res.status(404).json({ error: 'Ruta no encontrada' }));
 
-// Manejo centralizado de errores
-// las funciones async de los routers.
+// Express 5 dirige aquí los errores de los routers asíncronos y de Multer.
 app.use(async (error, req, res, next) => {
-  await discardUploads(req); 
+  if (!req.uploadsCommitted) await discardUploads(req);
   if (res.headersSent) return next(error);
 
   const isUploadError = error instanceof multer.MulterError;
@@ -41,11 +35,12 @@ app.use(async (error, req, res, next) => {
   }
   const message = isUploadError ? uploadErrorMessage(error)
     : error.type === 'entity.parse.failed' ? 'El cuerpo JSON no es válido'
-      : error.expose ? error.message : 'Solicitud inválida';
+      : error.status === 400 || error.status === 404 || error.expose ? error.message : 'Solicitud inválida';
   res.status(status).json({ error: message });
 });
 
-app.listen(PORT, (error) => {
-  if (error) throw error;
-  console.log(`Servidor escuchando en http://localhost:${PORT}`);
-});
+// Al importar app para pruebas no se ocupa el puerto de uso normal.
+if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
+  const port = Number(process.env.PORT) || 8080;
+  app.listen(port, () => console.log(`Huellas disponible en http://localhost:${port}`));
+}

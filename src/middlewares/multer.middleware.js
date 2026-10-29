@@ -3,7 +3,8 @@ import { randomUUID } from 'node:crypto';
 import { readFile, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { httpError } from '../utils/http.js';
+
+const httpError = (status, message) => Object.assign(new Error(message), { status });
 
 const IMG_DIR = fileURLToPath(new URL('../../public/img', import.meta.url));
 export const MAX_FILE_SIZE_MB = 5;

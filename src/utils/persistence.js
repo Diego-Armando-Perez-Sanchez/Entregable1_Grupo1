@@ -4,7 +4,6 @@ import { fileURLToPath } from 'node:url';
 const FILES = {
   users: fileURLToPath(new URL('../data/users.json', import.meta.url)),
   pets: fileURLToPath(new URL('../data/pets.json', import.meta.url)),
-  products: fileURLToPath(new URL('../data/products.json', import.meta.url)),
 };
 
 // Una cola de promesas por recurso: las operaciones de un mismo archivo se
@@ -48,4 +47,8 @@ export async function updateData(resource, callback) {
   return run;
 }
 
-export const nextId = (list) => list.reduce((max, item) => Math.max(max, item.id), 0) + 1;
+export function nextId(list) {
+  const id = list.reduce((max, item) => Math.max(max, item.id), 0) + 1;
+  if (!Number.isSafeInteger(id)) throw new Error('No se pudo generar un ID seguro');
+  return id;
+}
