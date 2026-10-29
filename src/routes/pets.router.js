@@ -1,30 +1,28 @@
 import { Router } from 'express';
 import { readData, updateData, nextId } from '../utils/persistence.js';
 import { uploadPets, verifyImages, deleteImages, toUrl } from '../middlewares/multer.middleware.js';
-import { httpError, parseId, findIndexById, readFields, text } from '../utils/http.js';
+import { requireAuth } from '../middlewares/auth.middleware.js';
+import { httpError, idParam, findIndexById, readFields, text, nonNegativeNumber } from '../utils/http.js';
 
 const router = Router();
 
-// En multipart/form-data la edad llega como texto; en JSON puede llegar como número.
-function age(value, name) {
-  const valid = typeof value === 'number' || (typeof value === 'string' && /^\s*\d+(\.\d+)?\s*$/.test(value));
-  const number = Number(value);
-  if (!valid || !Number.isFinite(number) || number < 0) {
-    throw httpError(400, `El campo "${name}" debe ser un número mayor o igual a 0`);
-  }
-  return number;
-}
-
-const FIELDS = { especie: text, color: text, edad: age, sexo: text };
+const FIELDS = { especie: text, color: text, edad: nonNegativeNumber, sexo: text };
 const NOT_FOUND = 'Mascota no encontrada';
 
-router.param('id', (req, res, next, value) => {
-  req.id = parseId(value);
-  next();
-});
+// Solo el propietario puede modificar o eliminar. Las mascotas creadas antes de existir
+// las cuentas no tienen ownerId: se muestran, pero nadie puede modificarlas.
+function assertOwner(pet, user) {
+  if (pet.ownerId === undefined) throw httpError(403, 'Esta mascota se registró antes de las cuentas de usuario y no puede modificarse');
+  if (pet.ownerId !== user.id) throw httpError(403, 'Solo puedes modificar tus propias mascotas');
+}
 
+router.use(requireAuth); // Se comprueba antes de que Multer guarde cualquier archivo.
+router.param('id', idParam);
+
+// Galería compartida entre usuarios autenticados; ?owner=me devuelve solo las propias.
 router.get('/', async (req, res) => {
-  res.json(await readData('pets'));
+  const pets = await readData('pets');
+  res.json(req.query.owner === 'me' ? pets.filter((pet) => pet.ownerId === req.user.id) : pets);
 });
 
 router.get('/:id', async (req, res) => {
@@ -34,8 +32,10 @@ router.get('/:id', async (req, res) => {
 
 router.post('/', uploadPets.array('img', 5), verifyImages, async (req, res) => {
   const fields = readFields(req.body, FIELDS, true);
-  const pet = await updateData('pets', (pets) => {
-    const newPet = { id: nextId(pets), ...fields, img: (req.files ?? []).map(toUrl) };
+  const pet = await updateData('pets', async (pets) => {
+    // El propietario sale del token verificado; la cuenta pudo eliminarse mientras llegaba la petición.
+    if (!(await readData('users')).some((u) => u.id === req.user.id)) throw httpError(401, 'La cuenta ya no existe');
+    const newPet = { id: nextId(pets), ownerId: req.user.id, ...fields, img: (req.files ?? []).map(toUrl) };
     pets.push(newPet);
     return newPet;
   });
@@ -49,6 +49,7 @@ router.put('/:id', uploadPets.array('img', 5), verifyImages, async (req, res) =>
 
   const { pet, oldImages } = await updateData('pets', (pets) => {
     const current = pets[findIndexById(pets, req.id, NOT_FOUND)];
+    assertOwner(current, req.user);
     const previous = current.img;
     Object.assign(current, changes);
     return { pet: current, oldImages: previous };
@@ -60,7 +61,11 @@ router.put('/:id', uploadPets.array('img', 5), verifyImages, async (req, res) =>
 });
 
 router.delete('/:id', async (req, res) => {
-  const pet = await updateData('pets', (pets) => pets.splice(findIndexById(pets, req.id, NOT_FOUND), 1)[0]);
+  const pet = await updateData('pets', (pets) => {
+    const index = findIndexById(pets, req.id, NOT_FOUND);
+    assertOwner(pets[index], req.user);
+    return pets.splice(index, 1)[0];
+  });
   await deleteImages(pet.img);
   res.json({ message: `Mascota ${pet.id} eliminada correctamente` });
 });

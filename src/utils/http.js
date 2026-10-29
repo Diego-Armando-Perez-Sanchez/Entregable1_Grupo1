@@ -11,6 +11,12 @@ export function parseId(value) {
   return Number(value);
 }
 
+// Para router.param('id', idParam): valida el ID antes de que Multer guarde archivos.
+export function idParam(req, res, next, value) {
+  req.id = parseId(value);
+  next();
+}
+
 export function findIndexById(list, id, notFoundMessage) {
   const index = list.findIndex((item) => item.id === id);
   if (index === -1) throw httpError(404, notFoundMessage);
@@ -39,4 +45,14 @@ export function text(value, name) {
     throw httpError(400, `El campo "${name}" debe ser un texto no vacío`);
   }
   return value.trim();
+}
+
+// En multipart/form-data los números llegan como texto; en JSON pueden llegar como número.
+export function nonNegativeNumber(value, name) {
+  const valid = typeof value === 'number' || (typeof value === 'string' && /^\s*\d+(\.\d+)?\s*$/.test(value));
+  const number = Number(value);
+  if (!valid || !Number.isFinite(number) || number < 0) {
+    throw httpError(400, `El campo "${name}" debe ser un número mayor o igual a 0`);
+  }
+  return number;
 }

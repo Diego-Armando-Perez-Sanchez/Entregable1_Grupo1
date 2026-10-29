@@ -1,33 +1,51 @@
 import { Router } from 'express';
+import { readData, updateData, nextId } from '../utils/persistence.js';
+import { requireAuth } from '../middlewares/auth.middleware.js';
+import { httpError, idParam, findIndexById, readFields, text, nonNegativeNumber } from '../utils/http.js';
+
 const router = Router();
 
-const data = [
-  { id: 1, name: 'Product 1', price: 10.99 },
-  { id: 2, name: 'Product 2', price: 19.99 },
-  { id: 3, name: 'Product 3', price: 5.99 },
-];
+// Campos del modelo original del ejemplo: { id, name, price }.
+const FIELDS = { name: text, price: nonNegativeNumber };
+const NOT_FOUND = 'Producto no encontrado';
 
-router.get('/', (req, res) => {
-  res.json(data);
+// Catálogo compartido: el proyecto no define roles, así que cualquier usuario
+// autenticado puede gestionarlo. Sin sesión no se puede leer ni modificar.
+router.use(requireAuth);
+router.param('id', idParam);
+
+router.get('/', async (req, res) => {
+  res.json(await readData('products'));
 });
 
-router.get('/:id', (req, res) => {
-  const { id } = req.params;
-  const product = data.find((p) => p.id === parseInt(id));
-  if (!product) {
-    return res.status(404).json({ error: 'Product not found' });
-  }
+router.get('/:id', async (req, res) => {
+  const products = await readData('products');
+  res.json(products[findIndexById(products, req.id, NOT_FOUND)]);
+});
+
+router.post('/', async (req, res) => {
+  const fields = readFields(req.body, FIELDS, true);
+  const product = await updateData('products', (products) => {
+    const newProduct = { id: nextId(products), ...fields };
+    products.push(newProduct);
+    return newProduct;
+  });
+  res.status(201).json(product);
+});
+
+router.put('/:id', async (req, res) => {
+  const changes = readFields(req.body, FIELDS, false);
+  if (!Object.keys(changes).length) throw httpError(400, 'No se enviaron campos para actualizar');
+  const product = await updateData('products', (products) => {
+    const current = products[findIndexById(products, req.id, NOT_FOUND)];
+    return Object.assign(current, changes);
+  });
   res.json(product);
 });
 
-router.post('/', (req, res) => {
-  const { id, name, price } = req.body;
-  if (!id || !name || !price) {
-    return res.status(400).json({ error: 'Missing fields to create a product' });
-  }
-  const newProduct = { id, name, price };
-  data.push(newProduct);
-  res.status(201).json(newProduct);
+router.delete('/:id', async (req, res) => {
+  const product = await updateData('products', (products) => products.splice(findIndexById(products, req.id, NOT_FOUND), 1)[0]);
+  res.json({ message: `Producto ${product.id} eliminado correctamente` });
 });
 
 export default router;

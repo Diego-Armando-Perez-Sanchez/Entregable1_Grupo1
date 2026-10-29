@@ -1,28 +1,35 @@
 import express from 'express';
 import multer from 'multer';
 import { fileURLToPath } from 'node:url';
+import { PORT } from './config.js';
+import authRouter from './routes/auth.router.js';
 import usersRouter from './routes/users.router.js';
 import petsRouter from './routes/pets.router.js';
 import productsRouter from './routes/products.router.js';
 import { discardUploads, uploadErrorMessage } from './middlewares/multer.middleware.js';
 
 const app = express();
-const PORT = 3000;
 
+app.disable('x-powered-by');
+app.use((req, res, next) => {
+  res.set({ 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'same-origin' });
+  next();
+});
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(fileURLToPath(new URL('../public', import.meta.url))));
 
+app.use('/api/auth', authRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/pets', petsRouter);
-app.use('/api/products', productsRouter); // Ruta del ejemplo de clase, fuera del alcance de la actividad.
+app.use('/api/products', productsRouter);
 
 app.use((req, res) => res.status(404).json({ error: 'Ruta no encontrada' }));
 
-// Manejo centralizado de errores. Express 5 envía aquí también los errores de
+// Manejo centralizado de errores
 // las funciones async de los routers.
 app.use(async (error, req, res, next) => {
-  await discardUploads(req); // Ninguna imagen de una operación fallida queda huérfana.
+  await discardUploads(req); 
   if (res.headersSent) return next(error);
 
   const isUploadError = error instanceof multer.MulterError;

@@ -4,11 +4,12 @@ import { fileURLToPath } from 'node:url';
 const FILES = {
   users: fileURLToPath(new URL('../data/users.json', import.meta.url)),
   pets: fileURLToPath(new URL('../data/pets.json', import.meta.url)),
+  products: fileURLToPath(new URL('../data/products.json', import.meta.url)),
 };
 
 // Una cola de promesas por recurso: las operaciones de un mismo archivo se
-// ejecutan en orden y las de usuarios y mascotas no se bloquean entre sí.
-const queues = { users: Promise.resolve(), pets: Promise.resolve() };
+// ejecutan en orden y las de recursos distintos no se bloquean entre sí.
+const queues = Object.fromEntries(Object.keys(FILES).map((resource) => [resource, Promise.resolve()]));
 
 function fileOf(resource) {
   if (!Object.hasOwn(FILES, resource)) throw new Error(`Recurso desconocido: ${resource}`);

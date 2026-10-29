@@ -4,7 +4,17 @@
     "firstname": "daniel",
     "lastname": "feria",
     "username": "dxferia",
-    "password": "e8fe1ec18f5e06d4acc76e201b006a73:bdb619e66f7ae811b44169b42110eaf1c03154c669b64ff5d1d608ac7260b361135237e6789f0c253eaf685dd761b3f119b3f2e6aff2941b7a1a3eae516a228e",
-    "avatar": "/img/users/1793281159010-fa15eb83-9bf8-4f4b-80bc-f17751a680df.png"
+    "password": "f9e868314f2648224a97fde9b8d7ef8d:38c7493e39704ccd0260af9f3fad3765f6f74f2ac8ff0262fa289a49789176f150b86f42018551ed6015133fec4fc1475e824c362f9abbcf1fac18c6b252105d",
+    "avatar": "/img/users/1793286943334-1f0f6864-5f94-4c01-8fa9-238cf646e52c.png",
+    "sessionKey": "e63b0452d7feec8836d307dd2fff3660"
+  },
+  {
+    "id": 2,
+    "firstname": "diego",
+    "lastname": "perez",
+    "username": "diep",
+    "password": "679fbd02d8dc4db953aeb8783fa541fd:94bc5efab26e881b361a94de01da989a95c0ca8d8077294bacaec5c6390c60c6e600c17c8c477600f9a5b4224c908dfe3802ae2884138d4e9393e95dc0411c3f",
+    "avatar": "/img/users/1793287528320-3fdd5c4b-186e-4f9f-9eec-03c50f0a3a6a.png",
+    "sessionKey": "6f107808027374296dc64dbedcb8b639"
   }
 ]
